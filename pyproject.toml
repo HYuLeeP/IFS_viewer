@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "IFS_viewer"
+version = "0.1.0"
+description = "Local browser viewer for FITS spectral cubes and images"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "Flask>=3.1,<4",
+    "plotly>=7,<8",
+    "waitress>=3,<4",
+    "numpy>=2,<3",
+    "astropy>=7,<9",
+    "ppxf>=9,<10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10"]
+
+[project.scripts]
+ifs-viewer = "ifs_viewer.__main__:main"
+ifs_viewer = "ifs_viewer.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ifs_viewer = [
+    "templates/*.html",
+    "static/*.css",
+    "static/*.js",
+    "static/vendor/mathjax/*",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

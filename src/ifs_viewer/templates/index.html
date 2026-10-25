@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <title>IFS_viewer</title>
+    <script>
+        (() => {
+            let theme = "dark";
+            try {
+                const savedTheme =
+                    localStorage.getItem("ifs-viewer-theme")
+                    ?? localStorage.getItem("spectral-atlas-theme");
+                theme = savedTheme === "light"
+                    ? "light"
+                    : "dark";
+            } catch {
+                theme = "dark";
+            }
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.style.colorScheme = theme;
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='18') }}">
+    <script src="{{ url_for('static', filename='vendor/mathjax/tex-svg.js') }}" defer></script>
+    <script src="{{ url_for('plotly_bundle') }}" defer></script>
+    <script src="{{ url_for('static', filename='app.js', v='18') }}" defer></script>
+</head>
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand-lockup">
+                <div class="brand-mark" aria-hidden="true">
+                    <span class="brand-orbit"></span>
+                    <span class="brand-spectrum"></span>
+                </div>
+                <div>
+                    <p class="eyebrow">Integral field · long slit</p>
+                    <h1>IFS_viewer</h1>
+                </div>
+            </div>
+
+            <div class="file-controls" aria-label="FITS file opening">
+                <label class="control-field control-field--hdu">
+                    <span>HDU</span>
+                    <select id="hduSelect" aria-label="FITS HDU" disabled>
+                        <option>No file open</option>
+                    </select>
+                </label>
+                <label class="control-field control-field--band" id="bandControl" hidden>
+                    <span>Band</span>
+                    <select id="bandSelect" aria-label="Image band"></select>
+                </label>
+                <input id="selectedFilePicker" type="file"
+                       accept=".fits,.fit,.fits.gz,application/fits" hidden>
+                <button class="button button--secondary" id="selectExplorerButton" type="button">
+                    Select in Explorer…
+                </button>
+                <button class="button button--secondary" id="openPathButton" type="button">
+                    Paste path…
+                </button>
+            </div>
+
+            <div class="topbar-status">
+                <div class="theme-switch" role="group" aria-label="Website theme">
+                    <button class="theme-choice is-active" type="button"
+                            data-theme-choice="dark" aria-pressed="true">Dark</button>
+                    <button class="theme-choice" type="button"
+                            data-theme-choice="light" aria-pressed="false">Light</button>
+                </div>
+                <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+                <span id="loadStatus" role="status">Ready — open a FITS file</span>
+            </div>
+        </header>
+
+        <nav class="narrow-view-switcher" id="narrowViewSwitcher" aria-label="Workspace view">
+            <button class="narrow-view-button is-active" id="mapViewButton" type="button"
+                    aria-pressed="true">Spatial map</button>
+            <button class="narrow-view-button" id="spectrumViewButton" type="button"
+                    aria-pressed="false">1D spectrum</button>
+        </nav>
+
+        <main class="workspace" id="workspace">
+            <section class="panel panel--map" aria-labelledby="mapTitle">
+                <header class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Spatial field</p>
+                        <div class="heading-line">
+                            <h2 id="mapTitle">Spatial view</h2>
+                            <span class="data-chip" id="imageRangeChip">No data</span>
+                        </div>
+                    </div>
+                    <div class="panel-actions">
+                        <fieldset class="projection-switch" id="projectionSwitch">
+                            <legend>Projection</legend>
+                            <label>
+                                <input type="radio" name="imageStatistic" value="median" checked>
+                                <span>Median</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="imageStatistic" value="mean">
+                                <span>Mean</span>
+                            </label>
+                        </fieldset>
+                        <button class="icon-button" id="mapResetButton" type="button" title="Reset zoom, pan, and rotation">
+                            <svg viewBox="0 0 20 20" aria-hidden="true">
+                                <path d="M4.4 7.2A6.3 6.3 0 1 1 3.8 11"/>
+                                <path d="M4.4 3.8v3.7H.8"/>
+                            </svg>
+                            <span>Reset view</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="map-workbench">
+                    <div class="map-viewport" id="mapViewport">
+                        <canvas id="mapCanvas" aria-label="Median flux image of the selected FITS cube"></canvas>
+                        <div class="map-empty" id="mapEmpty">
+                            <span class="empty-glyph" aria-hidden="true"></span>
+                            <strong>No FITS file open</strong>
+                            <span>Select in Explorer or paste a local path.</span>
+                        </div>
+                        <div class="map-busy" id="mapBusy" aria-live="polite">
+                            <span class="loading-ring" aria-hidden="true"></span>
+                            Updating spatial image
+                        </div>
+                        <div class="pixel-tooltip" id="pixelTooltip" role="status"></div>
+                        <button class="rotation-handle" id="rotationHandle" type="button" aria-label="Drag to rotate image">
+                            <svg viewBox="0 0 20 20" aria-hidden="true">
+                                <path d="M15.6 7.2A6.3 6.3 0 1 0 16.2 11"/>
+                                <path d="M15.6 3.8v3.7h3.6"/>
+                            </svg>
+                        </button>
+                        <div class="rotation-readout" id="rotationReadout">0°</div>
+                        <div class="map-help">
+                            <span>Scroll to zoom</span>
+                            <span>Drag to pan</span>
+                            <span>Click a pixel</span>
+                        </div>
+                    </div>
+
+                    <aside class="colorbar-controller" aria-label="Color scale controls">
+                        <label class="colorbar-value">
+                            <span>High</span>
+                            <input id="colorMaxInput" type="number" step="any" aria-label="Color scale maximum">
+                        </label>
+                        <div class="colorbar-track-wrap">
+                            <div class="colorbar-track" id="colorbarTrack">
+                                <div class="colorbar-gradient"></div>
+                                <button class="colorbar-handle colorbar-handle--high" id="colorHighHandle"
+                                        type="button" aria-label="Drag maximum color limit"></button>
+                                <button class="colorbar-handle colorbar-handle--low" id="colorLowHandle"
+                                        type="button" aria-label="Drag minimum color limit"></button>
+                            </div>
+                            <span class="colorbar-label">flux · scroll</span>
+                        </div>
+                        <label class="colorbar-value">
+                            <span>Low</span>
+                            <input id="colorMinInput" type="number" step="any" aria-label="Color scale minimum">
+                        </label>
+                        <div class="colorbar-actions">
+                            <button class="text-button" id="colorTightenButton"
+                                    type="button" title="Tighten editable color range">Tighter</button>
+                            <button class="text-button" id="colorWidenButton"
+                                    type="button" title="Widen editable color range">Wider</button>
+                        </div>
+                        <div class="colorbar-actions">
+                            <button class="text-button" id="colorResetButton" type="button">Auto</button>
+                            <button class="text-button" id="colorFullButton" type="button">Data</button>
+                        </div>
+                    </aside>
+                </div>
+
+                <footer class="map-footer">
+                    <div class="footer-stat">
+                        <span>Integrated interval</span>
+                        <strong id="integratedInterval">No data</strong>
+                    </div>
+                    <div class="footer-stat">
+                        <span>Selected pixel</span>
+                        <strong id="selectedPixelLabel">No pixel selected</strong>
+                    </div>
+                    <div class="footer-stat footer-stat--right">
+                        <span>Projection</span>
+                        <strong id="projectionLabel">No file</strong>
+                    </div>
+                </footer>
+            </section>
+
+            <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+                 aria-label="Resize spatial and spectral panels" tabindex="0">
+                <span></span>
+            </div>
+
+            <section class="right-stack" aria-label="Spectrum and FITS header">
+                <section class="panel panel--spectrum" aria-labelledby="spectrumTitle">
+                    <header class="panel-heading panel-heading--spectrum">
+                        <div>
+                            <p class="eyebrow">Extracted spectrum</p>
+                            <div class="heading-line">
+                                <h2 id="spectrumTitle">Pixel spectrum</h2>
+                                <span class="data-chip data-chip--quiet" id="spectrumModeChip">No file</span>
+                            </div>
+                        </div>
+                        <div class="spectrum-controls">
+                            <label class="control-field control-field--redshift">
+                                <span>Redshift <em>z</em></span>
+                                <input id="redshiftInput" type="number" step="any" inputmode="decimal"
+                                       placeholder="not set" aria-label="Redshift">
+                            </label>
+                            <label class="toggle-control" for="restFrameToggle">
+                                <input id="restFrameToggle" type="checkbox">
+                                <span class="toggle-track"><span></span></span>
+                                <span>Rest frame</span>
+                            </label>
+                            <button class="icon-button icon-button--compact" id="spectrumResetButton"
+                                    type="button" title="Reset spectral zoom">
+                                <svg viewBox="0 0 20 20" aria-hidden="true">
+                                    <path d="M4.4 7.2A6.3 6.3 0 1 1 3.8 11"/>
+                                    <path d="M4.4 3.8v3.7H.8"/>
+                                </svg>
+                                <span>Reset</span>
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="line-identification">
+                        <div class="line-copy">
+                            <span class="line-index">01</span>
+                            <div>
+                                <strong>Automated line identification</strong>
+                                <p id="lineHint">Click the spectrum.</p>
+                            </div>
+                        </div>
+                        <div class="line-controls">
+                            <label class="control-field control-field--line">
+                                <span>pPXF line</span>
+                                <select id="lineSelect" disabled>
+                                    <option value="">Choose a line</option>
+                                </select>
+                            </label>
+                            <button class="text-button text-button--quiet" id="clearLineButton"
+                                    type="button" disabled>Clear</button>
+                        </div>
+                        <div class="line-result" id="lineResult" aria-live="polite"></div>
+                    </div>
+
+                    <div class="spectrum-plot-wrap">
+                        <div id="spectrumPlot" class="spectrum-plot" aria-label="Extracted one-dimensional spectrum"></div>
+                        <div class="spectrum-empty" id="spectrumEmpty">
+                            <span>Open a FITS file to begin.</span>
+                        </div>
+                        <div class="spectrum-hint">
+                            Scroll to inspect wavelengths · Drag horizontally to set the image interval
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel panel--info" aria-labelledby="infoTitle">
+                    <header class="panel-heading panel-heading--info">
+                        <div>
+                            <p class="eyebrow">FITS metadata</p>
+                            <h2 id="infoTitle">Header inspector</h2>
+                        </div>
+                        <span class="data-chip data-chip--quiet" id="headerCount">No header loaded</span>
+                    </header>
+                    <div class="info-scroll">
+                        <div class="summary-grid" id="summaryGrid">
+                            <div class="summary-empty">Cube metadata will appear here.</div>
+                        </div>
+                        <div class="header-warning" id="headerWarning" hidden></div>
+                        <details class="header-details" id="headerDetails">
+                            <summary>
+                                <span>Complete FITS header</span>
+                                <span class="details-chevron" aria-hidden="true"></span>
+                            </summary>
+                            <div class="header-table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Keyword</th>
+                                            <th>Value</th>
+                                            <th>Comment</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="headerTableBody"></tbody>
+                                </table>
+                            </div>
+                        </details>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <dialog class="path-dialog" id="pathDialog" aria-labelledby="pathDialogTitle">
+        <form class="path-dialog-form" id="pathForm">
+            <header class="path-dialog-heading">
+                <div>
+                    <p class="eyebrow">Direct memory map</p>
+                    <h2 id="pathDialogTitle">Open a local FITS file</h2>
+                </div>
+                <button class="dialog-close" id="closePathButton" type="button"
+                        aria-label="Close path dialog">×</button>
+            </header>
+            <label class="path-field">
+                <span>FITS file path</span>
+                <input id="pathInput" type="text" list="recentPathList"
+                       autocomplete="off" spellcheck="false"
+                       placeholder="C:\path\to\cube.fits or /mnt/c/path/to/cube.fits">
+            </label>
+            <datalist id="recentPathList"></datalist>
+            <p class="path-help">
+                The file is opened in place and never copied. In Explorer,
+                use <strong>Shift + right-click → Copy as path</strong>, then paste it here.
+            </p>
+            <p class="path-error" id="pathError" role="alert" hidden></p>
+            <footer class="path-dialog-actions">
+                <button class="button button--ghost" id="cancelPathButton" type="button">
+                    Cancel
+                </button>
+                <button class="button button--primary" id="submitPathButton" type="submit">
+                    <span class="button-label">Open file</span>
+                    <span class="button-spinner" aria-hidden="true"></span>
+                </button>
+            </footer>
+        </form>
+    </dialog>
+
+    <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="false"></div>
+    <div class="app-loader" id="appLoader" aria-live="polite">
+        <div class="app-loader-card">
+            <span class="loading-ring loading-ring--large" aria-hidden="true"></span>
+            <strong>Preparing the cube</strong>
+            <span id="appLoaderText">Reading FITS metadata and collapsing the default interval.</span>
+        </div>
+    </div>
+</body>
+</html>
