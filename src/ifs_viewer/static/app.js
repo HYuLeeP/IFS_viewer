@@ -34,6 +34,9 @@
         loadStatus: document.querySelector("#loadStatus"),
         themeChoices: document.querySelectorAll("[data-theme-choice]"),
         workspace: document.querySelector("#workspace"),
+        rightStack: document.querySelector(".right-stack"),
+        rightSplitter: document.querySelector("#rightSplitter"),
+        infoPanel: document.querySelector(".panel--info"),
         mapViewButton: document.querySelector("#mapViewButton"),
         spectrumViewButton: document.querySelector("#spectrumViewButton"),
         splitter: document.querySelector("#splitter"),
@@ -91,6 +94,7 @@
         spectrum: null,
         selectedPixel: null,
         observedRange: null,
+        defaultWavelengthRange: null,
         colorLimits: { min: 0, max: 1 },
         autoColorLimits: { min: 0, max: 1 },
         colorDataRange: { min: 0, max: 1 },
@@ -983,6 +987,66 @@
         });
     }
 
+    function setInfoPanelHeight(height) {
+        const rightStackHeight = dom.rightStack.getBoundingClientRect().height;
+        const minimumSpectrumHeight = 260;
+        const splitterHeight = 9;
+        const maximumInfoHeight = Math.max(
+            150,
+            rightStackHeight - minimumSpectrumHeight - splitterHeight,
+        );
+        const selectedHeight = clamp(height, 150, maximumInfoHeight);
+        dom.rightStack.style.setProperty(
+            "--info-panel-height",
+            `${selectedHeight}px`,
+        );
+        requestAnimationFrame(() => {
+            if (dom.spectrumPlot._fullLayout) {
+                Plotly.Plots.resize(dom.spectrumPlot);
+            }
+        });
+    }
+
+    function bindRightSplitter() {
+        let dragBounds = null;
+        const move = (event) => {
+            if (!dragBounds) {
+                return;
+            }
+            setInfoPanelHeight(dragBounds.bottom - event.clientY - 4.5);
+        };
+        const end = () => {
+            dragBounds = null;
+            dom.rightSplitter.classList.remove("is-dragging");
+            window.removeEventListener("pointermove", move);
+        };
+        dom.rightSplitter.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            dragBounds = dom.rightStack.getBoundingClientRect();
+            dom.rightSplitter.classList.add("is-dragging");
+            dom.rightSplitter.setPointerCapture(event.pointerId);
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", end, { once: true });
+        });
+        dom.rightSplitter.addEventListener("dblclick", () => {
+            setInfoPanelHeight(262);
+        });
+        dom.rightSplitter.addEventListener("keydown", (event) => {
+            const currentHeight =
+                dom.infoPanel.getBoundingClientRect().height;
+            if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setInfoPanelHeight(currentHeight - 20);
+            } else if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setInfoPanelHeight(currentHeight + 20);
+            } else if (event.key === "Home") {
+                event.preventDefault();
+                setInfoPanelHeight(262);
+            }
+        });
+    }
+
     function finiteValues(payload = state.image) {
         if (!payload) {
             return [];
@@ -1228,6 +1292,7 @@
         state.spectrum = null;
         state.selectedPixel = null;
         state.observedRange = null;
+        state.defaultWavelengthRange = null;
         state.supportsSpectrum = false;
         mapView.clear();
         dom.mapEmpty.classList.remove("is-hidden");
@@ -1324,6 +1389,9 @@
                 min: payload.image.lambda_min,
                 max: payload.image.lambda_max,
             }
+            : null;
+        state.defaultWavelengthRange = state.observedRange
+            ? { ...state.observedRange }
             : null;
         state.spectrum = null;
         state.selectedPixel = null;
@@ -1731,7 +1799,11 @@
         }
     }
 
-    async function requestImageRange(observedMin, observedMax) {
+    async function requestImageRange(
+        observedMin,
+        observedMax,
+        { resetSpectrumRange = false } = {},
+    ) {
         if (!state.cube || !state.supportsSpectrum) {
             return;
         }
@@ -1770,7 +1842,11 @@
             applyAutomaticColorLimits();
             mapView.setSelectedPixel(state.selectedPixel);
             renderImageRange();
-            await renderSpectrum({ preserveRange: true });
+            await renderSpectrum(
+                resetSpectrumRange
+                    ? { resetRange: true }
+                    : { preserveRange: true },
+            );
             setStatus("Cube ready", "ready");
         } catch (error) {
             if (error.name !== "AbortError") {
@@ -1826,14 +1902,30 @@
 
     function populateLineSelect() {
         dom.lineSelect.replaceChildren(new Option("Choose a line", ""));
-        state.lines.forEach((line, index) => {
-            dom.lineSelect.append(
-                new Option(
-                    `${line.display_name || line.name} · ${line.rest_wavelength.toFixed(3)} Å`,
-                    String(index),
-                ),
-            );
-        });
+        const groups = [
+            ["emission", "Emission (pPXF)"],
+            ["absorption", "Absorption / stellar (NIST ASD)"],
+        ];
+        for (const [kind, label] of groups) {
+            const matchingLines = state.lines
+                .map((line, index) => ({ line, index }))
+                .filter((entry) => entry.line.kind === kind);
+            if (!matchingLines.length) {
+                continue;
+            }
+            const group = document.createElement("optgroup");
+            group.label = label;
+            for (const { line, index } of matchingLines) {
+                group.append(
+                    new Option(
+                        `${line.display_name || line.name} · `
+                        + `${line.rest_wavelength.toFixed(3)} Å`,
+                        String(index),
+                    ),
+                );
+            }
+            dom.lineSelect.append(group);
+        }
         dom.lineSelect.disabled = true;
     }
 
@@ -1903,11 +1995,16 @@
         }
 
         if (state.restFrame && state.hasRedshift) {
-            const visibleLines = state.lines.filter(
-                (line) =>
-                    line.rest_wavelength >= displayMinimum
-                    && line.rest_wavelength <= displayMaximum,
-            );
+            const visibleLines = state.lines
+                .filter(
+                    (line) =>
+                        line.rest_wavelength >= displayMinimum
+                        && line.rest_wavelength <= displayMaximum,
+                )
+                .sort(
+                    (first, second) =>
+                        first.rest_wavelength - second.rest_wavelength,
+                );
             visibleLines.forEach((line, index) => {
                 shapes.push({
                     type: "line",
@@ -1918,13 +2015,15 @@
                     y0: 0,
                     y1: 1,
                     line: {
-                        color: "rgba(102, 204, 255, 0.22)",
+                        color: line.kind === "absorption"
+                            ? "rgba(224, 177, 110, 0.35)"
+                            : "rgba(102, 204, 255, 0.22)",
                         width: 0.8,
                     },
                 });
                 annotations.push({
                     x: line.rest_wavelength,
-                    y: 1.015 + (index % 3) * 0.075,
+                    y: 1.015 + (index % 4) * 0.055,
                     xref: "x",
                     yref: "paper",
                     text: renderLineLatex(line),
@@ -1935,7 +2034,9 @@
                     font: {
                         family: "Cascadia Code, Consolas, monospace",
                         size: 8.5,
-                        color: colors.plotAxis,
+                        color: line.kind === "absorption"
+                            ? "#b7833e"
+                            : colors.plotAxis,
                     },
                 });
             });
@@ -2003,7 +2104,7 @@
         const layout = {
             paper_bgcolor: colors.plotPaper,
             plot_bgcolor: colors.plotPaper,
-            margin: { l: 64, r: 22, t: 72, b: 48 },
+            margin: { l: 64, r: 22, t: 84, b: 48 },
             showlegend: false,
             hovermode: "closest",
             dragmode: "select",
@@ -2244,7 +2345,10 @@
             }).then(() => autoScaleFlux(displayX, [newMinimum, newMaximum]));
         }, { passive: false });
 
-        dom.spectrumPlot.addEventListener("dblclick", () => resetSpectrumView());
+        dom.spectrumPlot.addEventListener(
+            "dblclick",
+            resetSpectrumToDefaultSelection,
+        );
 
         dom.spectrumResetButton.addEventListener("click", resetSpectrumView);
         dom.mapResetButton.addEventListener("click", () => mapView.resetView());
@@ -2335,6 +2439,21 @@
             .then(() => autoScaleFlux(xValues, range));
     }
 
+    function resetSpectrumToDefaultSelection() {
+        if (!state.spectrum) {
+            return;
+        }
+        if (!state.defaultWavelengthRange) {
+            resetSpectrumView();
+            return;
+        }
+        requestImageRange(
+            state.defaultWavelengthRange.min,
+            state.defaultWavelengthRange.max,
+            { resetSpectrumRange: true },
+        );
+    }
+
     function bindFileControls() {
         dom.hduSelect.addEventListener("change", () => {
             const hduIndex = Number(dom.hduSelect.value);
@@ -2392,6 +2511,7 @@
         setNarrowView("map");
         bindFileControls();
         bindSplitter();
+        bindRightSplitter();
         bindColorControls();
         bindSpectrumInteractions();
         mapView.setCallbacks({

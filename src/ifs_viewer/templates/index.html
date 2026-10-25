@@ -22,10 +22,10 @@
             document.documentElement.style.colorScheme = theme;
         })();
     </script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='18') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20') }}">
     <script src="{{ url_for('static', filename='vendor/mathjax/tex-svg.js') }}" defer></script>
     <script src="{{ url_for('plotly_bundle') }}" defer></script>
-    <script src="{{ url_for('static', filename='app.js', v='18') }}" defer></script>
+    <script src="{{ url_for('static', filename='app.js', v='20') }}" defer></script>
 </head>
 <body>
     <div class="app-shell">
@@ -38,6 +38,7 @@
                 <div>
                     <p class="eyebrow">Integral field · long slit</p>
                     <h1>IFS_viewer</h1>
+                    <p class="built-with">Built with Codex and DeepSeek</p>
                 </div>
             </div>
 
@@ -235,7 +236,7 @@
                         </div>
                         <div class="line-controls">
                             <label class="control-field control-field--line">
-                                <span>pPXF line</span>
+                                <span>Optical line</span>
                                 <select id="lineSelect" disabled>
                                     <option value="">Choose a line</option>
                                 </select>
@@ -244,6 +245,12 @@
                                     type="button" disabled>Clear</button>
                         </div>
                         <div class="line-result" id="lineResult" aria-live="polite"></div>
+                        <p class="line-source">
+                            Emission: <a href="https://doi.org/10.1093/mnras/stw3270"
+                            target="_blank" rel="noreferrer">pPXF/Cappellari 2017</a>
+                            · Absorption: <a href="https://physics.nist.gov/asd"
+                            target="_blank" rel="noreferrer">NIST ASD v5.12</a>
+                        </p>
                     </div>
 
                     <div class="spectrum-plot-wrap">
@@ -252,10 +259,17 @@
                             <span>Open a FITS file to begin.</span>
                         </div>
                         <div class="spectrum-hint">
-                            Scroll to inspect wavelengths · Drag horizontally to set the image interval
+                            Scroll to inspect · Drag horizontally to set the image interval ·
+                            Double-click to restore the default
                         </div>
                     </div>
                 </section>
+
+                <div class="right-splitter" id="rightSplitter" role="separator"
+                     aria-orientation="horizontal"
+                     aria-label="Resize spectrum and FITS header panels" tabindex="0">
+                    <span></span>
+                </div>
 
                 <section class="panel panel--info" aria-labelledby="infoTitle">
                     <header class="panel-heading panel-heading--info">

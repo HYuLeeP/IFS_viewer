@@ -30,10 +30,38 @@ _BALMER_LABELS = {
     "Halpha": (r"H_{\alpha}", "Hα"),
 }
 
+_ABSORPTION_LABELS = {
+    "CaII_K": (r"\mathrm{Ca\,II}\ K", "Ca II K"),
+    "CaII_H": (r"\mathrm{Ca\,II}\ H", "Ca II H"),
+    "MgI_b1": (r"\mathrm{Mg\,I}\ b_1", "Mg I b₁"),
+    "MgI_b2": (r"\mathrm{Mg\,I}\ b_2", "Mg I b₂"),
+    "MgI_b3": (r"\mathrm{Mg\,I}\ b_3", "Mg I b₃"),
+    "NaI_D2": (r"\mathrm{Na\,I}\ D_2", "Na I D₂"),
+    "NaI_D1": (r"\mathrm{Na\,I}\ D_1", "Na I D₁"),
+    "CaII_8498": (r"\mathrm{Ca\,II}\ 8498", "Ca II 8498"),
+    "CaII_8542": (r"\mathrm{Ca\,II}\ 8542", "Ca II 8542"),
+    "CaII_8662": (r"\mathrm{Ca\,II}\ 8662", "Ca II 8662"),
+}
+
+_ABSORPTION_LINES = (
+    ("CaII_K", 3933.663),
+    ("CaII_H", 3968.469),
+    ("MgI_b1", 5167.322),
+    ("MgI_b2", 5172.684),
+    ("MgI_b3", 5183.604),
+    ("NaI_D2", 5889.951),
+    ("NaI_D1", 5895.924),
+    ("CaII_8498", 8498.018),
+    ("CaII_8542", 8542.089),
+    ("CaII_8662", 8662.140),
+)
+
 
 def _line_display_metadata(ppxf_name: str) -> tuple[str, str]:
     if ppxf_name in _BALMER_LABELS:
         return _BALMER_LABELS[ppxf_name]
+    if ppxf_name in _ABSORPTION_LABELS:
+        return _ABSORPTION_LABELS[ppxf_name]
 
     bracket_match = re.fullmatch(
         r"\[([A-Za-z]+)\](\d+)(?:_d)?",
@@ -89,9 +117,25 @@ def line_catalog() -> tuple[dict[str, object], ...]:
                 "rest_wavelength": float(wavelength),
                 "wavelength_unit": "Angstrom",
                 "wavelength_convention": "air",
+                "kind": "emission",
+                "source": "pPXF emission-line templates",
             }
         )
-    return tuple(catalog)
+    catalog.sort(key=lambda line: line["rest_wavelength"])
+    absorption_catalog = [
+        {
+            "name": name,
+            "latex": _ABSORPTION_LABELS[name][0],
+            "display_name": _ABSORPTION_LABELS[name][1],
+            "rest_wavelength": wavelength,
+            "wavelength_unit": "Angstrom",
+            "wavelength_convention": "air",
+            "kind": "absorption",
+            "source": "NIST ASD v5.12",
+        }
+        for name, wavelength in _ABSORPTION_LINES
+    ]
+    return tuple(catalog + absorption_catalog)
 
 
 def redshift_from_line(

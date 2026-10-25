@@ -233,6 +233,11 @@ def test_ppxf_catalog_has_expected_air_wavelengths():
     assert display_catalog["Halpha"]["latex"] == r"H_{\alpha}"
     assert display_catalog["Halpha"]["display_name"] == "Hα"
     assert display_catalog["[OIII]5007_d"]["display_name"] == "[O III] 5007"
+    assert display_catalog["NaI_D2"]["kind"] == "absorption"
+    assert display_catalog["NaI_D2"]["rest_wavelength"] == pytest.approx(5889.951)
+    assert display_catalog["CaII_K"]["rest_wavelength"] == pytest.approx(3933.663)
+    assert display_catalog["CaII_8662"]["source"] == "NIST ASD v5.12"
+    assert display_catalog["Halpha"]["source"] == "pPXF emission-line templates"
 
 
 def test_redshift_from_exact_wavelength():

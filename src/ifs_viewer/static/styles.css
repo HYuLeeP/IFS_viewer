@@ -236,6 +236,14 @@ h2 {
     line-height: 1.2;
 }
 
+.built-with {
+    margin: 3px 0 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.02em;
+}
+
 .file-controls {
     display: flex;
     min-width: 0;
@@ -1083,16 +1091,18 @@ h2 {
 }
 
 .right-stack {
-    display: grid;
+    --info-panel-height: 262px;
+    display: flex;
     min-width: 0;
     min-height: 0;
-    grid-template-rows: minmax(340px, 1fr) 262px;
-    gap: 12px;
+    flex-direction: column;
 }
 
 .panel--spectrum {
     display: flex;
     overflow: hidden;
+    min-height: 260px;
+    flex: 1 1 auto;
     flex-direction: column;
 }
 
@@ -1195,6 +1205,7 @@ h2 {
     grid-template-columns: minmax(210px, 1fr) auto minmax(100px, 0.55fr);
     align-items: center;
     gap: 14px;
+    row-gap: 5px;
     padding: 10px 16px;
     border-bottom: 1px solid var(--line-soft);
     background: var(--line-id-bg);
@@ -1264,6 +1275,24 @@ h2 {
     text-align: right;
 }
 
+.line-source {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    line-height: 1.4;
+}
+
+.line-source a {
+    color: var(--accent-strong);
+    text-decoration: none;
+}
+
+.line-source a:hover {
+    text-decoration: underline;
+}
+
 .spectrum-plot-wrap {
     position: relative;
     min-height: 0;
@@ -1306,7 +1335,56 @@ h2 {
 .panel--info {
     display: flex;
     overflow: hidden;
+    flex: 0 0 var(--info-panel-height);
     flex-direction: column;
+}
+
+.right-splitter {
+    position: relative;
+    display: flex;
+    min-height: 9px;
+    flex: 0 0 9px;
+    align-items: center;
+    justify-content: center;
+    cursor: row-resize;
+    touch-action: none;
+}
+
+.right-splitter::before {
+    position: absolute;
+    right: 12px;
+    left: 12px;
+    top: 50%;
+    height: 1px;
+    background: var(--line);
+    content: "";
+    transition: background-color 140ms var(--ease-out);
+}
+
+.right-splitter span {
+    position: relative;
+    z-index: 1;
+    width: 38px;
+    height: 5px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--surface-raised);
+    transition:
+        width 180ms var(--ease-out),
+        border-color 140ms var(--ease-out),
+        background-color 140ms var(--ease-out);
+}
+
+.right-splitter:hover::before,
+.right-splitter.is-dragging::before {
+    background: rgba(102, 204, 255, 0.45);
+}
+
+.right-splitter:hover span,
+.right-splitter.is-dragging span {
+    width: 52px;
+    border-color: rgba(102, 204, 255, 0.58);
+    background: var(--splitter-active-bg);
 }
 
 .panel-heading--info {
@@ -1779,7 +1857,8 @@ h2 {
     }
 
     .right-stack {
-        grid-template-rows: minmax(520px, calc(100vh - 190px)) 320px;
+        height: min(900px, calc(100vh - 190px));
+        min-height: 720px;
     }
 
     .summary-grid {

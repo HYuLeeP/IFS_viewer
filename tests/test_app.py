@@ -47,6 +47,8 @@ def test_browser_shell_and_local_plotly_bundle(client):
     assert page.status_code == 200
     assert b"IFS_viewer" in page.data
     assert b"Header inspector" in page.data
+    assert b"Built with Codex and DeepSeek" in page.data
+    assert b"NIST ASD v5.12" in page.data
     assert b'id="fileSelect"' not in page.data
     assert b'id="openButton"' not in page.data
     assert b'data-theme-choice="dark"' in page.data
