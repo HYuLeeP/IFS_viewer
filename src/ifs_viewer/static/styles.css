@@ -1328,7 +1328,9 @@ h2 {
     color: rgba(110, 129, 147, 0.72);
     font-family: var(--font-mono);
     font-size: 8px;
+    line-height: 1.45;
     letter-spacing: 0.01em;
+    text-align: right;
     pointer-events: none;
 }
 

@@ -2101,10 +2101,12 @@
             });
         }
 
+        const topMargin =
+            state.restFrame && state.hasRedshift ? 84 : 24;
         const layout = {
             paper_bgcolor: colors.plotPaper,
             plot_bgcolor: colors.plotPaper,
-            margin: { l: 64, r: 22, t: 84, b: 48 },
+            margin: { l: 64, r: 22, t: topMargin, b: 72 },
             showlegend: false,
             hovermode: "closest",
             dragmode: "select",
