@@ -2023,7 +2023,7 @@
                 });
                 annotations.push({
                     x: line.rest_wavelength,
-                    y: 1.015 + (index % 4) * 0.055,
+                    y: 1.015 + (index % 4) * 0.045,
                     xref: "x",
                     yref: "paper",
                     text: renderLineLatex(line),
@@ -2102,7 +2102,7 @@
         }
 
         const topMargin =
-            state.restFrame && state.hasRedshift ? 84 : 24;
+            state.restFrame && state.hasRedshift ? 42 : 24;
         const layout = {
             paper_bgcolor: colors.plotPaper,
             plot_bgcolor: colors.plotPaper,
