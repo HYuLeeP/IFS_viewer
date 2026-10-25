@@ -43,7 +43,6 @@ The installer:
 - creates a private environment at `~/.local/share/ifs-viewer/venv`;
 - installs all runtime dependencies;
 - installs the `ifs-viewer` command in `~/.local/bin`;
-- also installs `ifs_viewer` as a command alias;
 - adds `~/.local/bin` to an existing Bash or Zsh startup file when needed.
 
 Open a new terminal, or reload the startup file printed by the installer:
@@ -59,7 +58,13 @@ source ~/.bashrc      # Ubuntu/WSL Bash
 ifs-viewer
 ```
 
-Open <http://127.0.0.1:8050>.
+The default browser opens automatically at <http://127.0.0.1:8050>.
+
+For remote sessions or automation, suppress browser opening:
+
+```bash
+ifs-viewer --no-open
+```
 
 To select another data root or port:
 
@@ -70,11 +75,30 @@ ifs-viewer --data-root /path/to/FITS/data --port 8060
 Stop the server with `Ctrl+C`. If port 8050 is already occupied, choose another
 port with `--port`.
 
-To remove the managed installation:
+## Update
+
+From the Git checkout, update the source and reinstall into the managed
+environment:
+
+```bash
+./install.sh --update
+```
+
+This runs `git pull --ff-only` when the script is inside a Git checkout, then
+reinstalls the package and dependencies without duplicating PATH entries.
+
+## Uninstall
+
+Remove the managed installation:
 
 ```bash
 ./install.sh --uninstall
 ```
+
+Uninstall removes the `ifs-viewer` launcher, any legacy `ifs_viewer` launcher,
+the environment under `~/.local/share/ifs-viewer`, the managed PATH marker
+blocks from Bash and Zsh startup files, and startup files that the installer
+created and left empty. It does not modify FITS data or the project checkout.
 
 ## Opening Files
 

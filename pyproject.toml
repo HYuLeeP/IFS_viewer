@@ -24,7 +24,6 @@ test = ["pytest>=9,<10"]
 
 [project.scripts]
 ifs-viewer = "ifs_viewer.__main__:main"
-ifs_viewer = "ifs_viewer.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

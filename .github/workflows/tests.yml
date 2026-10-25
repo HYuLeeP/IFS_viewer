@@ -38,13 +38,22 @@ jobs:
           PYTHON_BIN=python3 \
           ./install.sh
           test -x "$TEST_HOME/.local/bin/ifs-viewer"
-          test -x "$TEST_HOME/.local/bin/ifs_viewer"
+          test ! -e "$TEST_HOME/.local/bin/ifs_viewer"
           grep -q "IFS_viewer PATH" "$TEST_HOME/.zshrc"
           "$TEST_HOME/.local/bin/ifs-viewer" --help
+          IFS_VIEWER_SKIP_GIT_PULL=1 \
+          HOME="$TEST_HOME" \
+          XDG_DATA_HOME="$TEST_HOME/.local/share" \
+          XDG_BIN_HOME="$TEST_HOME/.local/bin" \
+          PYTHON_BIN=python3 \
+          ./install.sh --update
           HOME="$TEST_HOME" \
           XDG_DATA_HOME="$TEST_HOME/.local/share" \
           XDG_BIN_HOME="$TEST_HOME/.local/bin" \
           ./install.sh --uninstall
+          test ! -e "$TEST_HOME/.local/bin/ifs-viewer"
+          test ! -e "$TEST_HOME/.local/share/ifs-viewer"
+          test ! -e "$TEST_HOME/.zshrc"
 
       - name: Check JavaScript syntax
         run: node --check src/ifs_viewer/static/app.js
